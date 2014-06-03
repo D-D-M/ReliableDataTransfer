@@ -5,12 +5,12 @@
 #include <stdlib.h>
 #include <errno.h>
 
+#define PACKETSIZE 512
 typedef enum
 {
     REQUEST,
     DATA,
-    ACK,
-    NAK
+    ACK
 } packet_t;
 
 struct srpacket
@@ -18,12 +18,12 @@ struct srpacket
     packet_t type; // Request? ACK? NAK?
     int sequence; // Packet sequence number
     int length;
-    char data[512];
+    char data[PACKETSIZE+1]; // +1 for the zero byte \0
 };
 
 int p_header_size()
 {
-    return sizeof(struct srpacket) - 512; // Minus the 512 bytes of data
+    return sizeof(struct srpacket) - PACKETSIZE; // Minus the 512 bytes of data
 }
 
 int p_size()
