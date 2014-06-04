@@ -19,7 +19,6 @@ int main (int argc, char *argv[])
     }
 
     int sockfd, portnum, bytes_recv, bytes_sent;
-//    int num_ints = 3; // Number of ints in a packet.
 
     socklen_t sin_size;
 
@@ -67,7 +66,7 @@ int main (int argc, char *argv[])
     send_data.sequence = htonl(send_data.sequence);
     send_data.length = htonl(send_data.length);
     */
-   
+    int last_packet = 0; // The sequence number of the last packet that was received.
     while (1)
     {
         if (send_data.type == REQUEST)
@@ -92,33 +91,48 @@ int main (int argc, char *argv[])
         recv_data.sequence = ntohl(recv_data.sequence);
         recv_data.length = ntohl(recv_data.length);
         */
-
+        // TO-DO: CHECK TO MAKE SURE THAT THE PROGRAM DOESN'T SEGFAULT IF recvfrom() FAILS! i.e. if bytesrecv == 0
         recv_data.data[bytes_recv] = '\0';
         print_packet_info_client(&recv_data, SERVER);
-//        printf("Received : %s\n", recv_data.data);
+        // printf("Received : %s\n", recv_data.data);
 
         // --------------------------------
-        // SEND acknowledgement
+        // PREPARE acknowledgement
         // --------------------------------
         memset(&send_data, 0, sizeof(struct srpacket));
         send_data.type = ACK;
-        send_data.sequence = recv_data.sequence;
         strcpy(send_data.data, "Acknowledged.");
         send_data.data[strlen(send_data.data)] = '\0'; // Zero byte
         send_data.length = p_header_size() + strlen(send_data.data) + 1; // Might need +1 for zero byte
-        // Convert to network byte order
-        /*
-        send_data.type = htonl(send_data.type);
-        send_data.sequence = htonl(send_data.sequence);
-        send_data.length = htonl(send_data.length);
-        */
-        // Send
-        printf("Sending acknowledgement...\n");
-        sendto(sockfd, &send_data, send_data.length, 0, 
-                    (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
-        print_packet_info_client(&send_data, CLIENT);
-        // printf("Packet sent.\n");
-        // printf("-------------------------------\n");
+        // ----------------------------------------------------------------
+        // SEND acknowledgement, depending on the last packet received.
+        // ----------------------------------------------------------------
+        if (recv_data.sequence != last_packet) // Packet received OUT OF ORDER
+        {
+            send_data.sequence = last_packet;
+            // Send
+            printf("Sending acknowledgement...\n");
+            sendto(sockfd, &send_data, send_data.length, 0, 
+                        (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
+            print_packet_info_client(&send_data, CLIENT);
+
+        }
+        else            // Packet received in order
+        {
+            send_data.sequence = recv_data.sequence;
+            // Convert to network byte order
+            /*
+            send_data.type = htonl(send_data.type);
+            send_data.sequence = htonl(send_data.sequence);
+            send_data.length = htonl(send_data.length);
+            */
+            last_packet = recv_data.sequence;
+            // Send
+            printf("Sending acknowledgement...\n");
+            sendto(sockfd, &send_data, send_data.length, 0, 
+                        (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
+            print_packet_info_client(&send_data, CLIENT);
+        }
 
     }
     

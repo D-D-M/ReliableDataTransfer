@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
     long file_length = 0;
     int base = 0;
     int seq_num = 0;
-    int max = cwnd - 1;
+    int end_wnd = cwnd - 1; // The end of the current "window"
 
     // Need a loop counter perhaps
     while (1)
@@ -115,9 +115,7 @@ int main(int argc, char *argv[])
         memset(&recv_data, 0, sizeof(struct srpacket)); // Zero out the packet
         recv_data.length = p_size(); // Initialize recv_data to be the full packet size, to be shrunk later
         recv_data.sequence = 0;
-
         // printf("Attempting to receive packet from client.\n");
-        
         bytes_read = recvfrom(sockfd, &recv_data, recv_data.length, 0,
                             (struct sockaddr *)&cli_addr, &addr_size);
         // Convert to host byte order
@@ -126,21 +124,12 @@ int main(int argc, char *argv[])
         recv_data.length = ntohl(recv_data.length);
         recv_data.type = ntohl(recv_data.type);
         */
-
         recv_data.data[bytes_read] = '\0';
-
         // printf("Packet received, number of bytes read = %d\n", bytes_read);
         print_packet_info_server(&recv_data, CLIENT); // CLIENT is the one who sent this packet
-        // printf("Packet type: %d\n", recv_data.type);
-        // printf("Packet data: %s\n", recv_data.data);
-        // printf("Packet seq #: %d\n", recv_data.sequence);
-
         // printf("(%s, %d) said : ", inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port));
         // printf("%s\n", recv_data.data);
-
-        // What type of request is it? 
-        // IF REQUEST, then open the file and load its bytes into the buffer.
-        
+    
         if (recv_data.type == REQUEST) // We need to check if the file exists and split it into packets
         {
             // OPEN THE FILE, LOAD IT INTO A BUFFER
@@ -178,7 +167,7 @@ int main(int argc, char *argv[])
             // Figure out how many packets we will need.
             numpackets = ((file_length-1)/ PACKETSIZE) + 1; // Integer division
                                                         // We want 512 bytes to be 1 packet
-            printf("This file will be divided into %d packets.\n", numpackets);                                                    
+            printf("This file will be divided into %d packets.\n", numpackets);
             /*
             // Test the buffer again
             printf("NOW Buffer contains:\n");
@@ -189,60 +178,65 @@ int main(int argc, char *argv[])
         printf("Number of packets remaining to send: %d\n", numpackets);
         if (numpackets > 0)
         {
-            // --------------------------------------------
-            // Construct packet i from the buffer
-            // --------------------------------------------
-            // printf("Constructing packet with sequence #%d\n", seq_num);
-            memset(&send_data, 0, sizeof(struct srpacket)); 
-            // printf("Memset worked\n");
-            // construct_next_packet_data(seq_num, buffer, &send_data);
-            send_data.type = DATA;
-            send_data.sequence = seq_num;
-            numpackets--;
+            // NOTES FOR FUTURE DAVID:
+            // The sender is going to need a buffer for the last N packets sent,
+            // in case those packets need to be re-sent.
+            
+            // if (recv_data.sequence > base)
+                // --------------------------------------------
+                // Construct packet i from the buffer
+                // --------------------------------------------
+                // printf("Constructing packet with sequence #%d\n", seq_num);
+                memset(&send_data, 0, sizeof(struct srpacket)); 
+                // printf("Memset worked\n");
+                // construct_next_packet_data(seq_num, buffer, &send_data);
+                send_data.type = DATA;
+                send_data.sequence = seq_num;
+                numpackets--;
 
-            if (numpackets == 0)    // If we're sending the last packet, only send the remaining bytes.
-                send_data.length = (file_length % PACKETSIZE);
-            else                    // Otherwise send the full packet size
-                send_data.length = PACKETSIZE; 
-            // Put the data into the packet's data field
-            // printf("Attempting memcpy...\n");
-            // printf("packlen is %d\n", send_data.length);
-            // printf("seqnum is %d\n", seq_num);
-            // printf("packsz is %d\n", PACKETSIZE);
-            int buffadd = seq_num*PACKETSIZE;
-            char* chunk = &buffer[buffadd];
-            // printf("Data at buffer[%d] is %s !\n", buffadd, chunk);
-            // memcpy(send_data.data, &buffer[seq_num*PACKETSIZE], send_data.length);
-            memcpy(send_data.data, chunk, send_data.length); // ONLY copy send_data.length bytes
-            // printf("Memcpy worked\n");
-            send_data.data[send_data.length] = '\0'; // Zero out the value just past the packet.data
-            
-            printf("Sending packet...\n");
-            send_data.length += p_header_size();
-            // Convert to network byte order
-            /*
-            send_data.type = htonl(send_data.type);
-            send_data.sequence = htonl(send_data.sequence);
-            send_data.length = htonl(send_data.length);
-            */
-            // Send
-            sendto(sockfd, &send_data, send_data.length, 0, 
-                        (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
-            print_packet_info_server(&send_data, SERVER);
-            // printf("Packet sent.\n");
-            // printf("-------------------------------\n");
-            
-            seq_num++;
-            // fflush(stdout);
-            /*
-            // Send the next packet to the client, if there is one.
-            strcpy(send_data.data, "it works!"); // Just something random.
-            send_data.length = p_header_size() + strlen(send_data.data) + 1;
-            sendto(sockfd, &send_data, send_data.length, 0, 
-                        (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
-            printf("Packet sent.\n");
-            fflush(stdout);
-            */
+                if (numpackets == 0)    // If we're sending the last packet, only send the remaining bytes.
+                    send_data.length = (file_length % PACKETSIZE);
+                else                    // Otherwise send the full packet size
+                    send_data.length = PACKETSIZE; 
+                // Put the data into the packet's data field
+                // printf("Attempting memcpy...\n");
+                // printf("packlen is %d\n", send_data.length);
+                // printf("seqnum is %d\n", seq_num);
+                // printf("packsz is %d\n", PACKETSIZE);
+                int buffadd = seq_num*PACKETSIZE;
+                char* chunk = &buffer[buffadd];
+                // printf("Data at buffer[%d] is %s !\n", buffadd, chunk);
+                // memcpy(send_data.data, &buffer[seq_num*PACKETSIZE], send_data.length);
+                memcpy(send_data.data, chunk, send_data.length); // ONLY copy send_data.length bytes
+                // printf("Memcpy worked\n");
+                send_data.data[send_data.length] = '\0'; // Zero out the value just past the packet.data
+                
+                printf("Sending packet...\n");
+                send_data.length += p_header_size();
+                // Convert to network byte order
+                /*
+                send_data.type = htonl(send_data.type);
+                send_data.sequence = htonl(send_data.sequence);
+                send_data.length = htonl(send_data.length);
+                */
+                // Send
+                sendto(sockfd, &send_data, send_data.length, 0, 
+                            (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
+                print_packet_info_server(&send_data, SERVER);
+                // printf("Packet sent.\n");
+                // printf("-------------------------------\n");
+                
+                seq_num++;
+                // fflush(stdout);
+                /*
+                // Send the next packet to the client, if there is one.
+                strcpy(send_data.data, "it works!"); // Just something random.
+                send_data.length = p_header_size() + strlen(send_data.data) + 1;
+                sendto(sockfd, &send_data, send_data.length, 0, 
+                            (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
+                printf("Packet sent.\n");
+                fflush(stdout);
+                */
         }
         else
         {
