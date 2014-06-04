@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
         recv_data.length = p_size(); // Initialize recv_data to be the full packet size, to be shrunk later
         recv_data.sequence = 0;
 
-//        printf("Attempting to receive packet from client.\n");
+        // printf("Attempting to receive packet from client.\n");
         
         bytes_read = recvfrom(sockfd, &recv_data, recv_data.length, 0,
                             (struct sockaddr *)&cli_addr, &addr_size);
@@ -129,14 +129,14 @@ int main(int argc, char *argv[])
 
         recv_data.data[bytes_read] = '\0';
 
-//        printf("Packet received, number of bytes read = %d\n", bytes_read);
+        // printf("Packet received, number of bytes read = %d\n", bytes_read);
         print_packet_info_server(&recv_data, CLIENT); // CLIENT is the one who sent this packet
-//        printf("Packet type: %d\n", recv_data.type);
-//        printf("Packet data: %s\n", recv_data.data);
-//        printf("Packet seq #: %d\n", recv_data.sequence);
+        // printf("Packet type: %d\n", recv_data.type);
+        // printf("Packet data: %s\n", recv_data.data);
+        // printf("Packet seq #: %d\n", recv_data.sequence);
 
-//        printf("(%s, %d) said : ", inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port));
-//        printf("%s\n", recv_data.data);
+        // printf("(%s, %d) said : ", inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port));
+        // printf("%s\n", recv_data.data);
 
         // What type of request is it? 
         // IF REQUEST, then open the file and load its bytes into the buffer.
@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
             rewind(file);
             // buffer = (char *)malloc((file_length+1)*sizeof(char));
             buffer = (char *)malloc((file_length)*sizeof(char));
-//            memset(&buffer, 0, sizeof(char)*(file_length+1));
+            // memset(&buffer, 0, sizeof(char)*(file_length+1));
             if (!buffer)
             {
                 printf("File \"%s\" too big to fit in memory.\n", filename);
@@ -184,8 +184,7 @@ int main(int argc, char *argv[])
             printf("NOW Buffer contains:\n");
             printf("%s\n-------------------------------\n\n", buffer);
             */
-
-                                                       // (512-1)/(512) + 1 = 1
+            // (512-1)/(512) + 1 = 1
         }
         printf("Number of packets remaining to send: %d\n", numpackets);
         if (numpackets > 0)
@@ -193,9 +192,9 @@ int main(int argc, char *argv[])
             // --------------------------------------------
             // Construct packet i from the buffer
             // --------------------------------------------
-//            printf("Constructing packet with sequence #%d\n", seq_num);
+            // printf("Constructing packet with sequence #%d\n", seq_num);
             memset(&send_data, 0, sizeof(struct srpacket)); 
-//            printf("Memset worked\n");
+            // printf("Memset worked\n");
             // construct_next_packet_data(seq_num, buffer, &send_data);
             send_data.type = DATA;
             send_data.sequence = seq_num;
@@ -206,16 +205,16 @@ int main(int argc, char *argv[])
             else                    // Otherwise send the full packet size
                 send_data.length = PACKETSIZE; 
             // Put the data into the packet's data field
-//            printf("Attempting memcpy...\n");
-//            printf("packlen is %d\n", send_data.length);
-//            printf("seqnum is %d\n", seq_num);
-//            printf("packsz is %d\n", PACKETSIZE);
+            // printf("Attempting memcpy...\n");
+            // printf("packlen is %d\n", send_data.length);
+            // printf("seqnum is %d\n", seq_num);
+            // printf("packsz is %d\n", PACKETSIZE);
             int buffadd = seq_num*PACKETSIZE;
             char* chunk = &buffer[buffadd];
-//            printf("Data at buffer[%d] is %s !\n", buffadd, chunk);
+            // printf("Data at buffer[%d] is %s !\n", buffadd, chunk);
             // memcpy(send_data.data, &buffer[seq_num*PACKETSIZE], send_data.length);
             memcpy(send_data.data, chunk, send_data.length); // ONLY copy send_data.length bytes
-//            printf("Memcpy worked\n");
+            // printf("Memcpy worked\n");
             send_data.data[send_data.length] = '\0'; // Zero out the value just past the packet.data
             
             printf("Sending packet...\n");
@@ -249,7 +248,7 @@ int main(int argc, char *argv[])
         {
             printf("File transfer complete.\n");
         }
-//        return 0;
+        // return 0;
     }
     free(buffer);
 
