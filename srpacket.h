@@ -52,11 +52,17 @@ int set_packet_corruption(const double p_corr)
 {
     time_t t;
     srand((unsigned) time(&t)); // Seed the random number generator based on the current time.
-    double legit = (double)rand() / (double)RAND_MAX;
+    double legit = drand48(); // Generates a random double between 0.0 and 1.0, inclusive. 
     if (legit >= p_corr)
-        return 0; // No corruption, packet is legit.
+    {
+        printf("Legit had a value of %f, which is GREATER than %f\n", legit, p_corr);
+        return 0;
+    }
     else
+    {
+        printf("Legit had a value of %f, which is LESS than %f\n", legit, p_corr);
         return 1;
+    }
 }
 
 void print_packet_info_server(const struct srpacket *pac, sender_t stype)

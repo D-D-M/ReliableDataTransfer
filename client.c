@@ -105,12 +105,14 @@ int main (int argc, char *argv[])
         strcpy(send_data.data, "Acknowledged.");
         send_data.data[strlen(send_data.data)] = '\0'; // Zero byte
         send_data.length = p_header_size() + strlen(send_data.data) + 1; // Might need +1 for zero byte
-        send_data.corrupt = set_packet_corruption(p_corr);
+        send_data.corrupt = 0;
+        // send_data.corrupt = set_packet_corruption(p_corr);
         // ----------------------------------------------------------------
         // SEND acknowledgement, depending on the last packet received.
         // ----------------------------------------------------------------
-        if (recv_data.sequence != last_packet) // Packet received OUT OF ORDER
+        if (recv_data.sequence != last_packet || recv_data.corrupt == 1) // Packet received OUT OF ORDER or is CORRUPT
         {
+            // The ACK should be for the last correctly-received packet.
             send_data.sequence = last_packet;
             // Send
             printf("Sending acknowledgement...\n");
@@ -119,7 +121,7 @@ int main (int argc, char *argv[])
             print_packet_info_client(&send_data, CLIENT);
 
         }
-        else            // Packet received in order
+        else // Packet is legit
         {
             send_data.sequence = recv_data.sequence;
             // Convert to network byte order

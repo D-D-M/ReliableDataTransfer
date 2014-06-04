@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
             */
             // (512-1)/(512) + 1 = 1
         }
-        printf("Number of packets remaining to send: %d\n", numpackets);
+        printf("Number of remaining packets to send: %d\n", numpackets);
         if (numpackets > 0)
         {
             // NOTES FOR FUTURE DAVID:
