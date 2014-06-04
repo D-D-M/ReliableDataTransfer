@@ -13,6 +13,12 @@ typedef enum
     ACK
 } packet_t;
 
+typedef enum
+{
+    SERVER,
+    CLIENT
+} sender_t;
+
 struct srpacket
 {
     packet_t type; // Request? ACK? NAK?
@@ -20,6 +26,66 @@ struct srpacket
     int length;
     char data[PACKETSIZE+1]; // +1 for the zero byte \0
 };
+
+char* get_packet_type(packet_t ptype)
+{
+    switch (ptype)
+    {
+        case 0:
+            return "REQUEST";
+        case 1:
+            return "DATA";
+        case 2:
+            return "ACK";
+    }
+    return "UNKNOWN";
+}
+void print_with_indent(const int indent, const char* string)
+{
+    printf("%*s" "%s", indent, " ", string);
+    return;
+}
+
+void print_packet_info_server(const struct srpacket *pac, sender_t stype)
+{
+    // TO-DO: Fill this out
+    printf("==========================================\n");
+    printf("PACKET ");
+    if (stype == SERVER)
+        printf("outbound to CLIENT\n");
+    else
+        printf("incoming from CLIENT\n");
+    printf("Header------------------------------------\n");
+    printf("------------------------------------------\n");
+    printf("    Type: %s\n", get_packet_type(pac->type));
+    printf("    Sequence Number: %d\n", pac->sequence);
+    printf("    Length: %d bytes\n", pac->length);
+    printf("Data--------------------------------------\n");
+    printf("------------------------------------------\n");
+    printf("%s\n",pac->data);
+    printf("\n==========================================\n");
+    return;
+}
+void print_packet_info_client(const struct srpacket *pac, sender_t stype)
+{
+    // TO-DO: Fill this out
+    printf("==========================================\n");
+    printf("PACKET ");
+    if (stype == SERVER)
+        printf("incoming from SERVER\n");
+    else
+        printf("outbound to SERVER\n");
+    printf("Header------------------------------------\n");
+    printf("------------------------------------------\n");
+    printf("    Type: %s\n", get_packet_type(pac->type));
+    printf("    Sequence Number: %d\n", pac->sequence);
+    printf("    Length: %d bytes\n", pac->length);
+    printf("Data--------------------------------------\n");
+    printf("------------------------------------------\n");
+    printf("%s\n",pac->data);
+    printf("\n==========================================\n");
+    return;
+}
 
 int p_header_size()
 {
