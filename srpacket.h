@@ -5,12 +5,13 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#define PACKETSIZE 512
+#define PACKETSIZE 1024
 typedef enum
 {
     REQUEST,
     DATA,
-    ACK
+    ACK,
+    FIN
 } packet_t;
 
 typedef enum
@@ -25,7 +26,8 @@ struct srpacket
     int sequence; // Packet sequence number
     int corrupt;
     int length;
-    char data[PACKETSIZE+1]; // +1 for the zero byte \0
+    // char data[PACKETSIZE+1]; // +1 for the zero byte \0
+    char data[PACKETSIZE];
 };
 
 char* get_packet_type(packet_t ptype)

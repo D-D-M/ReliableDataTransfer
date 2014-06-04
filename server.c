@@ -116,10 +116,11 @@ int main(int argc, char *argv[])
         // ------------------------------------
         struct srpacket recv_data;
         memset(&recv_data, 0, sizeof(struct srpacket)); // Zero out the packet
-        recv_data.length = p_size(); // Initialize recv_data to be the full packet size, to be shrunk later
-        recv_data.sequence = 0;
+        // recv_data.length = PACKETSIZE; // Initialize recv_data to be the full packet size, to be shrunk later
+        // recv_data.sequence = 0;
         // printf("Attempting to receive packet from client.\n");
-        bytes_read = recvfrom(sockfd, &recv_data, recv_data.length, 0,
+        // bytes_read = recvfrom(sockfd, &recv_data, recv_data.length+p_header_size(), 0,
+        bytes_read = recvfrom(sockfd, &recv_data, sizeof(struct srpacket), 0,
                             (struct sockaddr *)&cli_addr, &addr_size);
         // Convert to host byte order
         /*
@@ -127,7 +128,7 @@ int main(int argc, char *argv[])
         recv_data.length = ntohl(recv_data.length);
         recv_data.type = ntohl(recv_data.type);
         */
-        recv_data.data[bytes_read] = '\0';
+        // recv_data.data[bytes_read] = '\0';
         // printf("Packet received, number of bytes read = %d\n", bytes_read);
         print_packet_info_server(&recv_data, CLIENT); // CLIENT is the one who sent this packet
         // printf("(%s, %d) said : ", inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port));
@@ -145,6 +146,7 @@ int main(int argc, char *argv[])
             if (!file)
             {
                 printf("File \"%s\" does not exist.\n", filename); 
+                // SEND A 'FIN' PACKET to the client
                 // continue;
                 exit(1);
             }
@@ -157,6 +159,8 @@ int main(int argc, char *argv[])
             if (!buffer)
             {
                 printf("File \"%s\" too big to fit in memory.\n", filename);
+                // SEND A 'FIN' PACKET to the client?
+                // The client should exit(1), and the server should continue;
                 // continue;
                 exit(1);
             }
@@ -212,10 +216,10 @@ int main(int argc, char *argv[])
                 // memcpy(send_data.data, &buffer[seq_num*PACKETSIZE], send_data.length);
                 memcpy(send_data.data, chunk, send_data.length); // ONLY copy send_data.length bytes
                 // printf("Memcpy worked\n");
-                send_data.data[send_data.length] = '\0'; // Zero out the value just past the packet.data
+                // send_data.data[send_data.length] = '\0'; // Zero out the value just past the packet.data
                 
                 printf("Sending packet...\n");
-                send_data.length += p_header_size();
+                // send_data.length += p_header_size();
                 send_data.corrupt = set_packet_corruption(p_corr);
                 // Convert to network byte order
                 /*
@@ -224,8 +228,9 @@ int main(int argc, char *argv[])
                 send_data.length = htonl(send_data.length);
                 */
                 // Send
-                sendto(sockfd, &send_data, send_data.length, 0, 
-                            (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
+                // sendto(sockfd, &send_data, send_data.length, 0, 
+                sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+                           (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
                 print_packet_info_server(&send_data, SERVER);
                 // printf("Packet sent.\n");
                 // printf("-------------------------------\n");
@@ -245,6 +250,7 @@ int main(int argc, char *argv[])
         else
         {
             printf("File transfer complete.\n");
+            // SEND A 'FIN' PACKET
             return 0;
         }
         // return 0;
