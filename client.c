@@ -56,6 +56,7 @@ int main (int argc, char *argv[])
     //------------------------------------
     send_data.type = REQUEST;
     send_data.sequence = 0;
+    send_data.corrupt = 0;
     strcpy(send_data.data, filename); // Might have to \0 out the last byte of data...not sure yet
     send_data.data[strlen(filename)] = '\0';
     send_data.length = p_header_size() + strlen(filename) + 1; // +1 for the null byte?
@@ -104,6 +105,7 @@ int main (int argc, char *argv[])
         strcpy(send_data.data, "Acknowledged.");
         send_data.data[strlen(send_data.data)] = '\0'; // Zero byte
         send_data.length = p_header_size() + strlen(send_data.data) + 1; // Might need +1 for zero byte
+        send_data.corrupt = set_packet_corruption(p_corr);
         // ----------------------------------------------------------------
         // SEND acknowledgement, depending on the last packet received.
         // ----------------------------------------------------------------

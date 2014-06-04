@@ -213,6 +213,7 @@ int main(int argc, char *argv[])
                 
                 printf("Sending packet...\n");
                 send_data.length += p_header_size();
+                send_data.corrupt = set_packet_corruption(p_corr);
                 // Convert to network byte order
                 /*
                 send_data.type = htonl(send_data.type);

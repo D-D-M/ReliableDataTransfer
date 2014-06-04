@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <time.h>
 
 #define PACKETSIZE 512
 typedef enum
@@ -23,6 +24,7 @@ struct srpacket
 {
     packet_t type; // Request? ACK? NAK?
     int sequence; // Packet sequence number
+    int corrupt;
     int length;
     char data[PACKETSIZE+1]; // +1 for the zero byte \0
 };
@@ -46,6 +48,17 @@ void print_with_indent(const int indent, const char* string)
     return;
 }
 
+int set_packet_corruption(const double p_corr)
+{
+    time_t t;
+    srand((unsigned) time(&t)); // Seed the random number generator based on the current time.
+    double legit = (double)rand() / (double)RAND_MAX;
+    if (legit >= p_corr)
+        return 0; // No corruption, packet is legit.
+    else
+        return 1;
+}
+
 void print_packet_info_server(const struct srpacket *pac, sender_t stype)
 {
     // TO-DO: Fill this out
@@ -59,6 +72,7 @@ void print_packet_info_server(const struct srpacket *pac, sender_t stype)
     printf("------------------------------------------\n");
     printf("    Type: %s\n", get_packet_type(pac->type));
     printf("    Sequence Number: %d\n", pac->sequence);
+    printf("    Corrupt? %s\n", pac->corrupt ? "YES" : "NO");
     printf("    Length: %d bytes\n", pac->length);
     printf("Data--------------------------------------\n");
     printf("------------------------------------------\n");
@@ -79,6 +93,7 @@ void print_packet_info_client(const struct srpacket *pac, sender_t stype)
     printf("------------------------------------------\n");
     printf("    Type: %s\n", get_packet_type(pac->type));
     printf("    Sequence Number: %d\n", pac->sequence);
+    printf("    Corrupt? %s\n", pac->corrupt ? "YES" : "NO");
     printf("    Length: %d bytes\n", pac->length);
     printf("Data--------------------------------------\n");
     printf("------------------------------------------\n");
