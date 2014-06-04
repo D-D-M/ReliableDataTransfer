@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -12,6 +13,7 @@
 
 int main (int argc, char *argv[])
 {
+    srand48(time(NULL)); // Seed RNG
     if (argc != 6)
     {
         printf("Arg count was %d.\n", argc);
@@ -105,7 +107,7 @@ int main (int argc, char *argv[])
         strcpy(send_data.data, "Acknowledged.");
         send_data.data[strlen(send_data.data)] = '\0'; // Zero byte
         send_data.length = p_header_size() + strlen(send_data.data) + 1; // Might need +1 for zero byte
-        send_data.corrupt = 0;
+        // send_data.corrupt = 0;
         // send_data.corrupt = set_packet_corruption(p_corr);
         // ----------------------------------------------------------------
         // SEND acknowledgement, depending on the last packet received.
@@ -114,6 +116,7 @@ int main (int argc, char *argv[])
         {
             // The ACK should be for the last correctly-received packet.
             send_data.sequence = last_packet;
+            send_data.corrupt = set_packet_corruption(p_corr);
             // Send
             printf("Sending acknowledgement...\n");
             sendto(sockfd, &send_data, send_data.length, 0, 
@@ -124,6 +127,7 @@ int main (int argc, char *argv[])
         else // Packet is legit
         {
             send_data.sequence = recv_data.sequence;
+            send_data.corrupt = set_packet_corruption(p_corr);
             // Convert to network byte order
             /*
             send_data.type = htonl(send_data.type);

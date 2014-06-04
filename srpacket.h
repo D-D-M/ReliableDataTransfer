@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <time.h>
 
 #define PACKETSIZE 512
 typedef enum
@@ -50,8 +49,6 @@ void print_with_indent(const int indent, const char* string)
 
 int set_packet_corruption(const double p_corr)
 {
-    time_t t;
-    srand((unsigned) time(&t)); // Seed the random number generator based on the current time.
     double legit = drand48(); // Generates a random double between 0.0 and 1.0, inclusive. 
     if (legit >= p_corr)
     {

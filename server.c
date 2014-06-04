@@ -1,4 +1,5 @@
 #include <stdio.h> // Printing
+#include <time.h> // To seed the random number generator
 #include <stdlib.h> // atoi
 #include <string.h>
 #include <sys/socket.h> // C sockets
@@ -58,6 +59,8 @@ void construct_next_packet_data(int i, const char* buffer, struct srpacket *pack
 */
 int main(int argc, char *argv[])
 {
+    srand48(time(NULL)); // Seed RNG
+
     if (argc != 5)
     {
         printf("Arg count was %d.\n", argc);
@@ -242,6 +245,7 @@ int main(int argc, char *argv[])
         else
         {
             printf("File transfer complete.\n");
+            return 0;
         }
         // return 0;
     }
