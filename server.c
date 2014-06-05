@@ -350,8 +350,9 @@ int main(int argc, char *argv[])
         }
         else
         {
-            printf("File transfer complete.\n");
-            // SEND A 'FIN' PACKET
+            printf("File transfer complete, sending FIN packet...\n");
+            memset(&send_data, 0, sizeof(struct srpacket));
+            // CONSTRUCT A 'FIN' PACKET
             return 0;
         }
             // return 0;
