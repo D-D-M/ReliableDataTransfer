@@ -13,6 +13,7 @@
 
 int main (int argc, char *argv[])
 {
+    double legit;
     srand48(time(NULL)); // Seed RNG
     if (argc != 6)
     {
@@ -71,7 +72,7 @@ int main (int argc, char *argv[])
     send_data.sequence = htonl(send_data.sequence);
     send_data.length = htonl(send_data.length);
     */
-    int last_packet = 0; // The sequence number of the last packet that was received.
+    int expecting_packet = 0; // The sequence number of the expected packet
     while (1)
     {
         if (send_data.type == REQUEST)
@@ -117,22 +118,27 @@ int main (int argc, char *argv[])
         // ----------------------------------------------------------------
         // SEND acknowledgement, depending on the last packet received.
         // ----------------------------------------------------------------
-        if (recv_data.sequence != last_packet || recv_data.corrupt == 1) // Packet received OUT OF ORDER or is CORRUPT
+        if (recv_data.sequence != expecting_packet || recv_data.corrupt == 1) // Packet received OUT OF ORDER or is CORRUPT
         {
             // The ACK should be for the last correctly-received packet.
-            send_data.sequence = last_packet;
+            send_data.sequence = expecting_packet;
             send_data.corrupt = set_packet_corruption(p_corr);
             // Send
-            printf("Sending acknowledgement...\n");
+            printf("Sending acknowledgement from if...\n");
             // sendto(sockfd, &send_data, send_data.length, 0, 
-            sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
-                        (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
-            print_packet_info_client(&send_data, CLIENT);
+            legit = drand48();
+//            if (legit >= p_loss)
+//            {
+                sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+                            (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
+                print_packet_info_client(&send_data, CLIENT);
+//            }
 
         }
         else // Packet is legit
         {
-            send_data.sequence = recv_data.sequence;
+            // send_data.sequence = recv_data.sequence + (bytes_recv - p_header_size());
+            send_data.sequence = recv_data.sequence + PACKETSIZE;
             send_data.corrupt = set_packet_corruption(p_corr);
             // Convert to network byte order
             /*
@@ -140,13 +146,18 @@ int main (int argc, char *argv[])
             send_data.sequence = htonl(send_data.sequence);
             send_data.length = htonl(send_data.length);
             */
-            last_packet = recv_data.sequence;
+            // expecting_packet = recv_data.sequence + PACKETSIZE;
+            expecting_packet = send_data.sequence;
             // Send
-            printf("Sending acknowledgement...\n");
+            printf("Sending acknowledgement from else...\n");
             // sendto(sockfd, &send_data, send_data.length, 0, 
-            sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
-                       (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
-            print_packet_info_client(&send_data, CLIENT);
+            legit = drand48();
+//            if (legit >= p_loss)
+//            {
+                sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+                        (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
+                print_packet_info_client(&send_data, CLIENT);
+//            }
         }
 
     }

@@ -9,7 +9,7 @@ OBJ = server.o client.o
 all: server client
 
 server: server.o
-	$(CC) $(CFLAGS) -o $@ $< 
+	$(CC) $(CFLAGS) -o $@ $< -lrt
 
 client: client.o
 	$(CC) $(CFLAGS) -o $@ $< 

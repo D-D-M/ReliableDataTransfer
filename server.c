@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/socket.h> // C sockets
 #include <sys/types.h>
+#include <sys/poll.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -11,6 +12,8 @@
 #include <unistd.h>
 
 #include "srpacket.h"
+
+#define TIMEOUT 5 // Packet timeout 10 seconds
 /*
 long fill_buffer_from_file(const char *filename, char* buffer)
 {
@@ -60,6 +63,10 @@ void construct_next_packet_data(int i, const char* buffer, struct srpacket *pack
 int main(int argc, char *argv[])
 {
     srand48(time(NULL)); // Seed RNG
+    struct timespec timer, rightnow; // For packet timeouts
+    time_t timert, rightnowt;
+    struct pollfd ufd; // Polling for the timeout
+    int rv;
 
     if (argc != 5)
     {
@@ -68,17 +75,18 @@ int main(int argc, char *argv[])
     }
     // Parse command line arguments
     int portnum = atoi(argv[1]); // Make sure this is the right argument number
-    int cwnd = atoi(argv[2]); // Window size
+    int N = atoi(argv[2]); // Window size
     double p_loss = atof(argv[3]); // Probability of packet loss
     double p_corr = atof(argv[4]); // Probability of corrupt packet
 
-    int sockfd, bytes_read;
+    int sockfd, bytes_read, bytes_sent;
     char *buffer; // A buffer for the data of the served file.
     int numpackets = -1;
+    int totalnumpackets;
 
     // Send data: The packet to be sent to the client.
     struct srpacket send_data;
-    send_data.sequence = 0;
+    struct srpacket recv_data;
         
     socklen_t addr_size;
 
@@ -105,23 +113,63 @@ int main(int argc, char *argv[])
     // Think about this in terms of packets...
     // uninitialized file = divided into packets
     long file_length = 0;
+    int last_ACK = 0; // We know that the first ACK# we get will be 1024
     int base = 0;
+    int rn = 0; // Request number
+    int sn = 0; // Sequence number, incremented by 1 every time
     int seq_num = 0;
-    int end_wnd = cwnd - 1; // The end of the current "window"
+    int ew = N - 1; // The end of the current "window"
 
     // Need a loop counter perhaps
+    time(&timert);
     while (1)
     {
         // RECEIVE request from client. 
         // ------------------------------------
-        struct srpacket recv_data;
+        // struct srpacket recv_data;
         memset(&recv_data, 0, sizeof(struct srpacket)); // Zero out the packet
         // recv_data.length = PACKETSIZE; // Initialize recv_data to be the full packet size, to be shrunk later
         // recv_data.sequence = 0;
         // printf("Attempting to receive packet from client.\n");
         // bytes_read = recvfrom(sockfd, &recv_data, recv_data.length+p_header_size(), 0,
-        bytes_read = recvfrom(sockfd, &recv_data, sizeof(struct srpacket), 0,
-                            (struct sockaddr *)&cli_addr, &addr_size);
+
+
+        ufd.fd = sockfd;
+        ufd.events = POLLIN;
+        rv = poll(&ufd, 1, 5000); // Poll for 3 seconds
+        if (rv == -1)
+        {
+            perror("poll");
+        }
+        else if (rv == 0)
+        {
+            printf("Client hasn't sent any data.\n");
+            recv_data.sequence = last_ACK;
+            recv_data.type = 2; // Give it the ACK flag
+            sn = base;
+        }
+        else
+        {
+            if (ufd.revents & POLLIN)
+                bytes_read = recvfrom(sockfd, &recv_data, sizeof(struct srpacket), 0,
+                                (struct sockaddr *)&cli_addr, &addr_size);
+        }
+        // CHECK TIMEOUT HERE
+        // clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &rightnow);
+        // int difftime = diff(timer, rightnow).tv_sec;
+        // rightnowt = clock();
+        time(&rightnowt);
+        time_t difftime = rightnowt - timert;
+        printf("Difftime is %ld\n", (long int)difftime);
+        if (difftime >= TIMEOUT)
+        {
+            printf("=\n=\n=\nTimeout! Now what?\n=\n=\n=\n"); 
+            sn = base; // I think this is all we need to do....
+            // sn = recv_data.sequence/(int)PACKETSIZE;
+        }
+        //
+        //
+        //
         // Convert to host byte order
         /*
         recv_data.sequence = ntohl(recv_data.sequence);
@@ -166,57 +214,102 @@ int main(int argc, char *argv[])
             }
             fread(buffer, file_length, 1, file);
             fclose(file);
-            // char* filename; // Doesn't work, accessing uninitialized memory causes segfault
-            // char* filename = (char *)malloc(sizeof(char)* (recv_data.length - p_header_size()));
-            // file_length = fill_buffer_from_file(filename, buffer); // Check existence, fill the buffer.
             printf("File is now in the buffer, size %ld bytes.\n", file_length);
 
             // Figure out how many packets we will need.
             numpackets = ((file_length-1)/ PACKETSIZE) + 1; // Integer division
                                                         // We want 512 bytes to be 1 packet
+            totalnumpackets = numpackets;
             printf("This file will be divided into %d packets.\n", numpackets);
-            /*
-            // Test the buffer again
-            printf("NOW Buffer contains:\n");
-            printf("%s\n-------------------------------\n\n", buffer);
-            */
-            // (512-1)/(512) + 1 = 1
         }
+        // else // The received packet is an ACK
+        // { 
         printf("Number of remaining packets to send: %d\n", numpackets);
-        if (numpackets > 0)
+        // if (numpackets > 0)
+        /*
+        if (last_ACK == recv_data.sequence)
         {
+            // reset timer
+            // update lastack
+            last_ACK += PACKETSIZE;
+        }
+        */
+        printf("recvdataseq is %d, filelen is %ld, last_ACK is %d\n", recv_data.sequence, file_length, last_ACK);
+        // if (recv_data.sequence < file_length)
+        if (last_ACK < file_length)
+        {
+            printf("Entering send loop...\n");
             // NOTES FOR FUTURE DAVID:
-            // The sender is going to need a buffer for the last N packets sent,
-            // in case those packets need to be re-sent.
+            // The sender is NOT going to need a buffer for the last N packets sent,
+            // because we can just ask for the next X packets from the start of the buffer.
             
-            // if (recv_data.sequence > base)
-                // --------------------------------------------
+            //  if last_ACK == recv_data.sequence
+            //      reset timer
+            //      last_ACK++
+            if (last_ACK == recv_data.sequence || last_ACK == 0)
+            {
+                // reset timer
+                // clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer);
+                // timert = clock();
+                time(&timert);
+                // update lastack
+                // last_ACK += recv_data.length;
+            }
+            rn = recv_data.sequence / (int)PACKETSIZE;
+            // sn = rn;
+            // We only get to increment ew if last_ACK matches up
+            /*
+            if (rn > base)
+            {
+                ew = ew + (rn - base);
+                base = rn;
+            }
+            */
+            // If the request number is bigger than the base,
+            // If the request seqnum is equal to the last ACK'd packet,
+            // and if the request is not corrupt....
+            printf("base = %d\n", base);
+            printf("rn   = %d\n", rn);
+            printf("lACK before = %d, ", last_ACK);
+            if (rn > base && last_ACK == (recv_data.sequence - PACKETSIZE) && recv_data.corrupt == 0)
+            // if (rn > base && base == (last_ACK/PACKETSIZE) - 1 && recv_data.corrupt == 0)
+            {
+                // Then we can shift the window over by one, and reset the timer
+                ew = ew + (rn - base);
+                base = rn;
+                // timert = clock();
+                time(&timert);
+                // clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer); // Reset the timer
+                last_ACK += PACKETSIZE; // Update the last acknowledged packet
+            }
+            printf("lACK after = %d, ", last_ACK);
+            printf("Before constructing packet %d,\n", seq_num);
+            printf("sn is %d, ew is %d, and base is %d\n", sn, ew, base);
+            while (sn <= totalnumpackets && sn <= ew && sn >= base)
+            {
                 // Construct packet i from the buffer
-                // --------------------------------------------
-                // printf("Constructing packet with sequence #%d\n", seq_num);
+                printf("Constructing packet with sequence #%d\n", seq_num);
                 memset(&send_data, 0, sizeof(struct srpacket)); 
                 // printf("Memset worked\n");
                 // construct_next_packet_data(seq_num, buffer, &send_data);
                 send_data.type = DATA;
                 send_data.sequence = seq_num;
                 numpackets--;
+                
 
-                if (numpackets == 0)    // If we're sending the last packet, only send the remaining bytes.
+                if (numpackets == 0 && (file_length % PACKETSIZE) != 0)// If we're sending the last packet, only send the remaining bytes.
                     send_data.length = (file_length % PACKETSIZE);
                 else                    // Otherwise send the full packet size
                     send_data.length = PACKETSIZE; 
                 // Put the data into the packet's data field
-                // printf("Attempting memcpy...\n");
-                // printf("packlen is %d\n", send_data.length);
                 // printf("seqnum is %d\n", seq_num);
-                // printf("packsz is %d\n", PACKETSIZE);
-                int buffadd = seq_num*PACKETSIZE;
+                // int buffadd = seq_num*PACKETSIZE;
+                // THIS IS IMPORTANT FOR RE-SENDING THE N FRAME
+                if (sn == base)
+                    seq_num = last_ACK;
+                int buffadd = seq_num;
                 char* chunk = &buffer[buffadd];
-                // printf("Data at buffer[%d] is %s !\n", buffadd, chunk);
-                // memcpy(send_data.data, &buffer[seq_num*PACKETSIZE], send_data.length);
                 memcpy(send_data.data, chunk, send_data.length); // ONLY copy send_data.length bytes
-                // printf("Memcpy worked\n");
-                // send_data.data[send_data.length] = '\0'; // Zero out the value just past the packet.data
                 
                 printf("Sending packet...\n");
                 // send_data.length += p_header_size();
@@ -229,23 +322,31 @@ int main(int argc, char *argv[])
                 */
                 // Send
                 // sendto(sockfd, &send_data, send_data.length, 0, 
-                sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
-                           (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
-                print_packet_info_server(&send_data, SERVER);
+//                double legit = drand48();
+//                if (legit >= p_loss)
+//                {
+                    bytes_sent = sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+                            (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
+                    if (send_data.sequence/PACKETSIZE == base)
+                    {
+                        // start timer
+                        // timert = clock();
+                        time(&timert);
+                        // clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &timer);
+                    }
+                    print_packet_info_server(&send_data, SERVER);
+//                }
+//                else
+//                    continue;
                 // printf("Packet sent.\n");
                 // printf("-------------------------------\n");
                 
-                seq_num++;
+                seq_num += (bytes_sent - p_header_size());
+                sn++;
                 // fflush(stdout);
-                /*
-                // Send the next packet to the client, if there is one.
-                strcpy(send_data.data, "it works!"); // Just something random.
-                send_data.length = p_header_size() + strlen(send_data.data) + 1;
-                sendto(sockfd, &send_data, send_data.length, 0, 
-                            (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
-                printf("Packet sent.\n");
-                fflush(stdout);
-                */
+            }
+            printf("Pipeline full!\n");
+            printf("sn is %d\n", sn);
         }
         else
         {
@@ -253,7 +354,8 @@ int main(int argc, char *argv[])
             // SEND A 'FIN' PACKET
             return 0;
         }
-        // return 0;
+            // return 0;
+        //}
     }
     free(buffer);
 

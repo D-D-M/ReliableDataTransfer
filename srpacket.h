@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <time.h>
 
 #define PACKETSIZE 1024
 typedef enum
@@ -40,6 +41,8 @@ char* get_packet_type(packet_t ptype)
             return "DATA";
         case 2:
             return "ACK";
+        case 3:
+            return "FIN";
     }
     return "UNKNOWN";
 }
@@ -76,6 +79,7 @@ void print_packet_info_server(const struct srpacket *pac, sender_t stype)
     printf("Header------------------------------------\n");
     printf("------------------------------------------\n");
     printf("    Type: %s\n", get_packet_type(pac->type));
+    // printf("    Sequence Number: %d\n", pac->sequence*(int)PACKETSIZE);
     printf("    Sequence Number: %d\n", pac->sequence);
     printf("    Corrupt? %s\n", pac->corrupt ? "YES" : "NO");
     printf("    Length: %d bytes\n", pac->length);
@@ -97,6 +101,7 @@ void print_packet_info_client(const struct srpacket *pac, sender_t stype)
     printf("Header------------------------------------\n");
     printf("------------------------------------------\n");
     printf("    Type: %s\n", get_packet_type(pac->type));
+    // printf("    Sequence Number: %d\n", pac->sequence*(int)PACKETSIZE);
     printf("    Sequence Number: %d\n", pac->sequence);
     printf("    Corrupt? %s\n", pac->corrupt ? "YES" : "NO");
     printf("    Length: %d bytes\n", pac->length);
@@ -116,6 +121,26 @@ int p_size()
 {
     return sizeof(struct srpacket);
 }
+
+struct timespec diff(struct timespec start, struct timespec end)
+{
+    struct timespec temp;
+    if ((end.tv_nsec-start.tv_nsec)<0) {
+            temp.tv_sec = end.tv_sec-start.tv_sec-1;
+            temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+    } else {
+            temp.tv_sec = end.tv_sec-start.tv_sec;
+            temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+    }
+    return temp;
+};
+/*
+    if (diff(lastWrite, currentTime).tv_sec >=  experiment_run_time)
+    {
+        //Reset the previous time to the current time
+        //lastWrite = currentTime;
+    }
+*/
 
 
 /*
