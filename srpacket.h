@@ -48,7 +48,7 @@ char* get_packet_type(packet_t ptype)
     return "UNKNOWN";
 }
 
-int set_packet_corruption(const double p_corr)
+int play_the_odds(const double p_corr, int *counter)
 {
     double legit = drand48(); // Generates a random double between 0.0 and 1.0, inclusive. 
     if (legit >= p_corr)
@@ -59,6 +59,7 @@ int set_packet_corruption(const double p_corr)
     else
     {
         // printf("Legit had a value of %f, which is LESS than %f\n", legit, p_corr);
+        *counter = *counter + 1;
         return 1;
     }
 }

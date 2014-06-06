@@ -13,7 +13,7 @@
 
 int main (int argc, char *argv[])
 {
-    double legit;
+    // double legit;
     srand48(time(NULL)); // Seed RNG
     char *buffer = NULL; // A buffer for the received data
     long bufsize = 0;
@@ -25,7 +25,12 @@ int main (int argc, char *argv[])
         usage_err();
     }
 
+    // For statistical purposes
+    int corrupt_count = 0;
+    int loss_count = 0;
+
     int sockfd, portnum, bytes_recv, bytes_sent;
+    int lost_packet = 0;
 
     socklen_t sin_size;
 
@@ -98,6 +103,12 @@ int main (int argc, char *argv[])
         // bytes_recv = recvfrom(sockfd, &recv_data, recv_data.length, 0,
         bytes_recv = recvfrom(sockfd, &recv_data, sizeof(struct srpacket), 0, 
                         (struct sockaddr*)&srv_addr, &sin_size);
+        lost_packet = play_the_odds(p_loss, &loss_count);
+        if (lost_packet)
+        {
+            printf("\nLOST PACKET!\n\n");
+            continue; // Do nothing else, just receive the packet and move on.
+        }
         // Convert to host byte order
         /*
         recv_data.type = ntohl(recv_data.type);
@@ -123,6 +134,8 @@ int main (int argc, char *argv[])
             send_data.length = 0;
             // Don't need to initialize the data because of the memset
             printf("%s. Sending FIN packet.\n", msg);
+            printf("STATS: Sent %d corrupt ACKs. Treated %d packets as \'lost\'.\n",
+                            corrupt_count, loss_count);
             bytes_sent = sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
                             (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
 
@@ -137,7 +150,7 @@ int main (int argc, char *argv[])
             else
                 error_die("Error writing buffer to file.");
 
-            return bytes_sent; // End the client process
+            return 0; // End the client process
         }
         if (!buffer)
         {
@@ -164,7 +177,7 @@ int main (int argc, char *argv[])
             memcpy(buffer+recv_data.sequence, recv_data.data, recv_data.length);
             // send_data.sequence = recv_data.sequence + (bytes_recv - p_header_size());
             send_data.sequence = recv_data.sequence + PACKETSIZE;
-            send_data.corrupt = set_packet_corruption(p_corr);
+            send_data.corrupt = play_the_odds(p_corr, &corrupt_count);
 
             // Convert to network byte order
             /*
@@ -177,12 +190,12 @@ int main (int argc, char *argv[])
             // Send
             // printf("Sending acknowledgement from else...\n");
             // sendto(sockfd, &send_data, send_data.length, 0, 
-            legit = drand48();
+
 //            if (legit >= p_loss)
 //            {
-                sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
-                        (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
-                print_packet_info_client(&send_data, CLIENT);
+            sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+                    (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
+            print_packet_info_client(&send_data, CLIENT);
 //            }
         }
         // if (recv_data.sequence != expecting_packet || recv_data.corrupt == 1) // Packet received OUT OF ORDER or is CORRUPT
@@ -191,16 +204,15 @@ int main (int argc, char *argv[])
             // Be sure to send duplicate ACKs? Not in the book
             // The ACK should be for the last correctly-received packet.
             send_data.sequence = expecting_packet;
-            send_data.corrupt = set_packet_corruption(p_corr);
+            send_data.corrupt = play_the_odds(p_corr, &corrupt_count);
             // Send
             // printf("Sending acknowledgement from if...\n");
             // sendto(sockfd, &send_data, send_data.length, 0, 
-            legit = drand48();
 //            if (legit >= p_loss)
 //            {
-                sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
-                            (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
-                print_packet_info_client(&send_data, CLIENT);
+            sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+                        (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
+            print_packet_info_client(&send_data, CLIENT);
 //            }
 
         }

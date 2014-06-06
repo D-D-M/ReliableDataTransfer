@@ -23,6 +23,10 @@ int main(int argc, char *argv[])
     struct pollfd ufd; // Polling for the timeout
     int rv;
 
+    // For statistical purposes
+    int corrupt_count = 0;
+    int loss_count = 0;
+
     if (argc != 5)
     {
         printf("Arg count was %d.\n", argc);
@@ -38,6 +42,7 @@ int main(int argc, char *argv[])
     char *buffer; // A buffer for the data of the served file.
     // int numpackets = -1;
 
+    int lost_packet = 0;
     int totalnumpackets = -1;
     long file_length = 0;
 
@@ -96,7 +101,7 @@ clientrequest:
             memset(&send_data, 0, sizeof(struct srpacket));
             send_data.type = FIN;
             send_data.sequence = 0;
-            send_data.corrupt = 0; // set_packet_corruption();
+            send_data.corrupt = 0; // play_the_odds();
             send_data.length = 0;
             // Don't need to initialize the data because of the memset
             printf("%s. Sending FIN packet.\n", msg);
@@ -121,7 +126,7 @@ clientrequest:
             memset(&send_data, 0, sizeof(struct srpacket));
             send_data.type = FIN;
             send_data.sequence = 0;
-            send_data.corrupt = 0; // set_packet_corruption();
+            send_data.corrupt = 0; // play_the_odds();
             send_data.length = 0;
             // Don't need to initialize the data because of the memset
             printf("%s. Sending FIN packet.\n", msg);
@@ -155,7 +160,7 @@ clientrequest:
             memset(&send_data, 0, sizeof(struct srpacket));
             send_data.type = FIN;
             send_data.sequence = 0;
-            send_data.corrupt = 0; // set_packet_corruption();
+            send_data.corrupt = 0; // play_the_odds();
             send_data.length = 0;
             // Don't need to initialize the data because of the memset
             printf("%s. Sending FIN packet.\n", msg);
@@ -199,14 +204,22 @@ clientrequest:
             seq_num = last_ACK;
             recv_data.type = ACK; // Give it the ACK flag
             sn = base;
-            printf("Resending (at most) %d packets, beginning with sequence number %d\n", N, last_ACK);
+            printf("Resending (at most) %d packets, beginning with sequence number %ld\n", N, last_ACK);
             sleep(2);
         }
         else
         {
             if (ufd.revents & POLLIN)
+            {
                 bytes_read = recvfrom(sockfd, &recv_data, sizeof(struct srpacket), 0,
                                 (struct sockaddr *)&cli_addr, &addr_size);
+                lost_packet = play_the_odds(p_loss, &loss_count);
+                if (lost_packet)
+                {
+                    printf("\nLOST PACKET!\n\n");
+                    continue; // Do nothing else, just receive the packet and move on.
+                }
+            }
         }
         // CHECK TIMEOUT HERE
         // clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &rightnow);
@@ -256,8 +269,6 @@ servicerequest:
         // if (recv_data.sequence < file_length)
         if (last_ACK < file_length)
         {
-            // printf("Entering send loop...\n");
-
             rn = recv_data.sequence / (int)PACKETSIZE;
             // If the request number is bigger than the base,
             // If the request seqnum is equal to the last ACK'd packet,
@@ -265,9 +276,7 @@ servicerequest:
             // printf("base = %d\n", base);
             // printf("rn   = %d\n", rn);
             // printf("lACK before = %d, ", last_ACK);
-            if (rn > base && recv_data.corrupt == 0 && 
-                            last_ACK == (recv_data.sequence - PACKETSIZE))
-            // if (rn > base && base == (last_ACK/PACKETSIZE) - 1 && recv_data.corrupt == 0)
+            if (rn > base && recv_data.corrupt == 0 && last_ACK == (recv_data.sequence - PACKETSIZE))
             {
                 // Then we can shift the window over by one, and reset the timer
                 // printf("\nSHIFTING SEND WINDOW.\n\n");
@@ -302,7 +311,7 @@ servicerequest:
                 memcpy(send_data.data, chunk, send_data.length); // ONLY copy send_data.length bytes
                 
                 // printf("Sending packet with sequence #%d...\n", seq_num);
-                send_data.corrupt = set_packet_corruption(p_corr);
+                send_data.corrupt = play_the_odds(p_corr, &corrupt_count);
                 send_data.total_length = file_length;
                 // Convert to network byte order
                 /*
@@ -344,12 +353,14 @@ servicerequest:
                 memset(&send_data, 0, sizeof(struct srpacket));
                 send_data.type = FIN;
                 send_data.sequence = 0;
-                send_data.corrupt = 0; // set_packet_corruption();
+                send_data.corrupt = 0; // play_the_odds();
                 send_data.length = 0;
                 // Don't need to initialize the data because of the memset
                 printf("===================================================\n");
                 printf("===================================================\n");
                 printf("%s. %ld bytes transmitted. Sending FIN packet.\n", msg, file_length);
+                printf("STATS: Sent %d corrupt packets. Treated %d packets as \'lost\'.\n",
+                            corrupt_count, loss_count);
                 printf("===================================================\n");
                 printf("===================================================\n");
                 bytes_sent = sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
@@ -372,7 +383,7 @@ servicerequest:
             memset(&send_data, 0, sizeof(struct srpacket));
             send_data.type = FIN;
             send_data.sequence = 0;
-            send_data.corrupt = 0; // set_packet_corruption();
+            send_data.corrupt = 0; // play_the_odds();
             send_data.length = 0;
             // Don't need to initialize the data because of the memset
             printf("===================================================\n");
