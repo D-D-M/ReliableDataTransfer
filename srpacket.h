@@ -27,6 +27,7 @@ struct srpacket
     int sequence; // Packet sequence number
     int corrupt;
     int length;
+    int total_length; // Total length of the file this DATA packet belongs to.
     // char data[PACKETSIZE+1]; // +1 for the zero byte \0
     char data[PACKETSIZE];
 };
@@ -46,30 +47,26 @@ char* get_packet_type(packet_t ptype)
     }
     return "UNKNOWN";
 }
-void print_with_indent(const int indent, const char* string)
-{
-    printf("%*s" "%s", indent, " ", string);
-    return;
-}
 
 int set_packet_corruption(const double p_corr)
 {
     double legit = drand48(); // Generates a random double between 0.0 and 1.0, inclusive. 
     if (legit >= p_corr)
     {
-        printf("Legit had a value of %f, which is GREATER than %f\n", legit, p_corr);
+        // printf("Legit had a value of %f, which is GREATER than %f\n", legit, p_corr);
         return 0;
     }
     else
     {
-        printf("Legit had a value of %f, which is LESS than %f\n", legit, p_corr);
+        // printf("Legit had a value of %f, which is LESS than %f\n", legit, p_corr);
         return 1;
     }
 }
 
 void print_packet_info_server(const struct srpacket *pac, sender_t stype)
 {
-    // TO-DO: Fill this out
+    // UNCOMMENT this for full packet info
+    /*
     printf("==========================================\n");
     printf("PACKET ");
     if (stype == SERVER)
@@ -87,11 +84,34 @@ void print_packet_info_server(const struct srpacket *pac, sender_t stype)
     printf("------------------------------------------\n");
     printf("%s\n",pac->data);
     printf("\n==========================================\n");
+    */
+    if (stype == SERVER)
+    {
+        printf("\nSENDING ==============> SEQ %d", pac->sequence);
+        if (pac->length < PACKETSIZE && pac->length > 0)
+            printf(" (size %d bytes)", pac->length); // Only print byte size if it's not a full/emtpy packet
+        if (pac->corrupt)
+            printf(" (CORRUPT)");
+
+        printf("\n\n");
+    }
+    else
+    {
+        printf("\nRECEIVING <============ ACK %d", pac->sequence);
+        // if (pac->length < PACKETSIZE && pac->length > 0)
+        //     printf(" (size %d bytes)"); // Only print byte size if it's not a full/emtpy packet
+        if (pac->corrupt)
+            printf(" (CORRUPT)");
+        
+        printf("\n\n");
+    }
+
     return;
 }
 void print_packet_info_client(const struct srpacket *pac, sender_t stype)
 {
-    // TO-DO: Fill this out
+    // UNCOMMENT this for full packet info
+    /*
     printf("==========================================\n");
     printf("PACKET ");
     if (stype == SERVER)
@@ -109,6 +129,28 @@ void print_packet_info_client(const struct srpacket *pac, sender_t stype)
     printf("------------------------------------------\n");
     printf("%s\n",pac->data);
     printf("\n==========================================\n");
+    */
+    if (stype == SERVER)
+    {
+        printf("\nRECEIVING <============ SEQ %d", pac->sequence);
+        if (pac->length < PACKETSIZE && pac->length > 0)
+            printf(" (size %d bytes)", pac->length); // Only print byte size if it's not a full/emtpy packet
+        if (pac->corrupt)
+            printf(" (corrupt)");
+        
+        printf("\n\n");
+    }
+    else
+    { 
+        printf("\nSENDING ==============> ACK %d", pac->sequence);
+        // if (pac->length < PACKETSIZE && pac->length > 0)
+        //     printf(" (size %d bytes)"); // Only print byte size if it's not a full/emtpy packet
+        if (pac->corrupt)
+            printf(" (corrupt)");
+        
+        printf("\n\n");
+    }
+
     return;
 }
 
@@ -121,27 +163,6 @@ int p_size()
 {
     return sizeof(struct srpacket);
 }
-
-struct timespec diff(struct timespec start, struct timespec end)
-{
-    struct timespec temp;
-    if ((end.tv_nsec-start.tv_nsec)<0) {
-            temp.tv_sec = end.tv_sec-start.tv_sec-1;
-            temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
-    } else {
-            temp.tv_sec = end.tv_sec-start.tv_sec;
-            temp.tv_nsec = end.tv_nsec-start.tv_nsec;
-    }
-    return temp;
-};
-/*
-    if (diff(lastWrite, currentTime).tv_sec >=  experiment_run_time)
-    {
-        //Reset the previous time to the current time
-        //lastWrite = currentTime;
-    }
-*/
-
 
 /*
  * Print out a system error message
