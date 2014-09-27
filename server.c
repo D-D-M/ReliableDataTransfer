@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "srpacket.h"
+#include "gbnpacket.h"
 
 #define TIMEOUT 3000 // Packet timeout TIMEOUT milliseconds
 
@@ -47,8 +47,8 @@ int main(int argc, char *argv[])
     long file_length = 0;
 
     // Send data: The packet to be sent to the client.
-    struct srpacket send_data;
-    struct srpacket recv_data;
+    struct gbnpacket send_data;
+    struct gbnpacket recv_data;
         
     socklen_t addr_size;
 
@@ -83,8 +83,8 @@ int main(int argc, char *argv[])
 clientrequest:
     printf("Waiting for client on port %d...\n", portnum);
     last_ACK = 0; base = 0; rn = 0; sn = 0; seq_num = 0; ew = N - 1;
-    memset(&recv_data, 0, sizeof(struct srpacket)); // Zero out the packet
-    bytes_read = recvfrom(sockfd, &recv_data, sizeof(struct srpacket), 0,
+    memset(&recv_data, 0, sizeof(struct gbnpacket)); // Zero out the packet
+    bytes_read = recvfrom(sockfd, &recv_data, sizeof(struct gbnpacket), 0,
                                 (struct sockaddr *)&cli_addr, &addr_size);
     if (recv_data.type == REQUEST) // We need to check if the file exists and split it into packets
     {
@@ -98,14 +98,14 @@ clientrequest:
         if (!file)
         {
             char *msg = "File does not exist";
-            memset(&send_data, 0, sizeof(struct srpacket));
+            memset(&send_data, 0, sizeof(struct gbnpacket));
             send_data.type = FIN;
             send_data.sequence = 0;
             send_data.corrupt = 0; // play_the_odds();
             send_data.length = 0;
             // Don't need to initialize the data because of the memset
             printf("%s. Sending FIN packet.\n", msg);
-            bytes_sent = sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+            bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                             (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
             goto clientrequest;
             // printf("File \"%s\" does not exist.\n", filename); 
@@ -123,14 +123,14 @@ clientrequest:
         {
             // printf("File \"%s\" too big to fit in memory.\n", filename);
             char *msg = "File was too big to fit into memory";
-            memset(&send_data, 0, sizeof(struct srpacket));
+            memset(&send_data, 0, sizeof(struct gbnpacket));
             send_data.type = FIN;
             send_data.sequence = 0;
             send_data.corrupt = 0; // play_the_odds();
             send_data.length = 0;
             // Don't need to initialize the data because of the memset
             printf("%s. Sending FIN packet.\n", msg);
-            bytes_sent = sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+            bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                             (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
             goto clientrequest;
             // SEND A 'FIN' PACKET to the client?
@@ -157,14 +157,14 @@ clientrequest:
     {
         // Construct & send a FIN packet letting the client know it was an invalid request
             char *msg = "Invalid request";
-            memset(&send_data, 0, sizeof(struct srpacket));
+            memset(&send_data, 0, sizeof(struct gbnpacket));
             send_data.type = FIN;
             send_data.sequence = 0;
             send_data.corrupt = 0; // play_the_odds();
             send_data.length = 0;
             // Don't need to initialize the data because of the memset
             printf("%s. Sending FIN packet.\n", msg);
-            bytes_sent = sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+            bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                             (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
             goto clientrequest;
     }
@@ -179,8 +179,8 @@ clientrequest:
     {
         // RECEIVE request from client. 
         // ------------------------------------
-        // struct srpacket recv_data;
-        memset(&recv_data, 0, sizeof(struct srpacket)); // Zero out the packet
+        // struct gbnpacket recv_data;
+        memset(&recv_data, 0, sizeof(struct gbnpacket)); // Zero out the packet
         // recv_data.length = PACKETSIZE; // Initialize recv_data to be the full packet size, to be shrunk later
         // recv_data.sequence = 0;
         // printf("Attempting to receive packet from client.\n");
@@ -205,13 +205,14 @@ clientrequest:
             recv_data.type = ACK; // Give it the ACK flag
             sn = base;
             printf("Resending (at most) %d packets, beginning with sequence number %ld\n", N, last_ACK);
+            printf("%.0f%% of packets have been reliably transferred.\n", (double)last_ACK/(double)PACKETSIZE);
             sleep(2);
         }
         else
         {
             if (ufd.revents & POLLIN)
             {
-                bytes_read = recvfrom(sockfd, &recv_data, sizeof(struct srpacket), 0,
+                bytes_read = recvfrom(sockfd, &recv_data, sizeof(struct gbnpacket), 0,
                                 (struct sockaddr *)&cli_addr, &addr_size);
                 lost_packet = play_the_odds(p_loss, &loss_count);
                 if (lost_packet)
@@ -293,7 +294,7 @@ servicerequest:
             while (sn < totalnumpackets && sn <= ew && sn >= base)
             {
                 // Construct packet i from the buffer
-                memset(&send_data, 0, sizeof(struct srpacket)); 
+                memset(&send_data, 0, sizeof(struct gbnpacket)); 
                 // printf("Memset worked\n");
                 // construct_next_packet_data(seq_num, buffer, &send_data);
                 send_data.type = DATA;
@@ -324,7 +325,7 @@ servicerequest:
 //                double legit = drand48();
 //                if (legit >= p_loss)
 //                {
-                    bytes_sent = sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+                    bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                             (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
                     /*
                     if (send_data.sequence/PACKETSIZE == base)
@@ -350,7 +351,7 @@ servicerequest:
             if (last_ACK >= file_length)
             {
                 char *msg = "File transfer complete";
-                memset(&send_data, 0, sizeof(struct srpacket));
+                memset(&send_data, 0, sizeof(struct gbnpacket));
                 send_data.type = FIN;
                 send_data.sequence = 0;
                 send_data.corrupt = 0; // play_the_odds();
@@ -363,8 +364,7 @@ servicerequest:
                             corrupt_count, loss_count);
                 printf("===================================================\n");
                 printf("===================================================\n");
-                bytes_sent = sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
-                (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
+                bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
                 goto clientrequest;
             }
             /*
@@ -380,7 +380,7 @@ servicerequest:
         else
         {
             char *msg = "NEVER GETTING HEREFile transfer complete";
-            memset(&send_data, 0, sizeof(struct srpacket));
+            memset(&send_data, 0, sizeof(struct gbnpacket));
             send_data.type = FIN;
             send_data.sequence = 0;
             send_data.corrupt = 0; // play_the_odds();
@@ -391,7 +391,7 @@ servicerequest:
             printf("%s. Sending FIN packet.\n", msg);
             printf("===================================================\n");
             printf("===================================================\n");
-            bytes_sent = sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+            bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                             (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
             goto clientrequest;
         }

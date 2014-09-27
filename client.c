@@ -9,7 +9,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#include "srpacket.h"
+#include "gbnpacket.h"
 
 int main (int argc, char *argv[])
 {
@@ -38,9 +38,9 @@ int main (int argc, char *argv[])
     struct hostent *host;
     
     // Send data
-    struct srpacket send_data;
+    struct gbnpacket send_data;
     // Receive data
-    struct srpacket recv_data;
+    struct gbnpacket recv_data;
     // recv_data.length = p_size();
     // recv_data.sequence = 0;
 
@@ -66,7 +66,7 @@ int main (int argc, char *argv[])
     //------------------------------------
     // SEND request for file
     //------------------------------------
-    memset(&send_data, 0, sizeof(struct srpacket));
+    memset(&send_data, 0, sizeof(struct gbnpacket));
     send_data.type = REQUEST;
     send_data.sequence = 0;
     send_data.corrupt = 0;
@@ -88,7 +88,7 @@ int main (int argc, char *argv[])
         {
             // Send
             // bytes_sent = sendto(sockfd, &send_data, send_data.length, 0,
-            bytes_sent = sendto(sockfd, &send_data, sizeof(struct srpacket), 0,
+            bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0,
                             (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
                         // TO-DO: Check to see if bytes_sent matches up with the length of the packet in total.
             // buffer = NULL;
@@ -101,7 +101,7 @@ int main (int argc, char *argv[])
         // --------------------------------
         printf("Waiting for response from CS118.\n");
         // bytes_recv = recvfrom(sockfd, &recv_data, recv_data.length, 0,
-        bytes_recv = recvfrom(sockfd, &recv_data, sizeof(struct srpacket), 0, 
+        bytes_recv = recvfrom(sockfd, &recv_data, sizeof(struct gbnpacket), 0, 
                         (struct sockaddr*)&srv_addr, &sin_size);
         lost_packet = play_the_odds(p_loss, &loss_count);
         if (lost_packet)
@@ -127,7 +127,7 @@ int main (int argc, char *argv[])
         {
             // Send a FIN in return, and end the client process
             char *msg = "Terminating connection.";
-            memset(&send_data, 0, sizeof(struct srpacket));
+            memset(&send_data, 0, sizeof(struct gbnpacket));
             send_data.type = FIN;
             send_data.sequence = 0;
             send_data.corrupt = 0; // set_packet_corruption();
@@ -136,7 +136,7 @@ int main (int argc, char *argv[])
             printf("%s. Sending FIN packet.\n", msg);
             printf("STATS: Sent %d corrupt ACKs. Treated %d packets as \'lost\'.\n",
                             corrupt_count, loss_count);
-            bytes_sent = sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+            bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                             (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
 
             // Modify the filename
@@ -159,7 +159,7 @@ int main (int argc, char *argv[])
             if (!buffer)
                 error_die("Not enough space for client file buffer.");
         }
-        memset(&send_data, 0, sizeof(struct srpacket));
+        memset(&send_data, 0, sizeof(struct gbnpacket));
         send_data.type = ACK;
         // strcpy(send_data.data, "Acknowledged.");
         // send_data.data[strlen(send_data.data)] = '\0'; // Zero byte
@@ -193,11 +193,16 @@ int main (int argc, char *argv[])
 
 //            if (legit >= p_loss)
 //            {
-            sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+            sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                     (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
             print_packet_info_client(&send_data, CLIENT);
 //            }
         }
+        // else if (recv_data.corrupt == 0 && recv_data.sequence < expecting_packet)
+        // {
+        //     printf("\nDUPLICATE PACKET, IGNORING!\n\n");
+        //     continue; // DUPLICATE PACKET
+        // }
         // if (recv_data.sequence != expecting_packet || recv_data.corrupt == 1) // Packet received OUT OF ORDER or is CORRUPT
         else // Packet is not legit
         {
@@ -210,7 +215,7 @@ int main (int argc, char *argv[])
             // sendto(sockfd, &send_data, send_data.length, 0, 
 //            if (legit >= p_loss)
 //            {
-            sendto(sockfd, &send_data, sizeof(struct srpacket), 0, 
+            sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                         (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
             print_packet_info_client(&send_data, CLIENT);
 //            }
