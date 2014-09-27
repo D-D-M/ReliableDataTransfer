@@ -86,6 +86,7 @@ clientrequest:
     memset(&recv_data, 0, sizeof(struct gbnpacket)); // Zero out the packet
     bytes_read = recvfrom(sockfd, &recv_data, sizeof(struct gbnpacket), 0,
                                 (struct sockaddr *)&cli_addr, &addr_size);
+    recv_data.type = ntohl(recv_data.type);
     if (recv_data.type == REQUEST) // We need to check if the file exists and split it into packets
     {
         // OPEN THE FILE, LOAD IT INTO A BUFFER
@@ -241,11 +242,11 @@ clientrequest:
         //
         //
         // Convert to host byte order
-        /*
+        /* 
         recv_data.sequence = ntohl(recv_data.sequence);
         recv_data.length = ntohl(recv_data.length);
         recv_data.type = ntohl(recv_data.type);
-        */
+        */ 
         // recv_data.data[bytes_read] = '\0';
         // printf("Packet received, number of bytes read = %d\n", bytes_read);
         print_packet_info_server(&recv_data, CLIENT); // CLIENT is the one who sent this packet
