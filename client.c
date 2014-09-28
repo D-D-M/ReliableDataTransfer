@@ -75,18 +75,14 @@ int main (int argc, char *argv[])
     // send_data.length = p_header_size() + strlen(filename) + 1; // +1 for the null byte?
     send_data.length = strlen(filename);
     printf("Sending request to CS118 for %s\n", filename);
-    // Convert to network byte order
-    /*
-    send_data.type = htonl(send_data.type);
-    send_data.sequence = htonl(send_data.sequence);
-    send_data.length = htonl(send_data.length);
-    */
     long expecting_packet = 0; // The sequence number of the expected packet
     while (1)
     {
         if (send_data.type == REQUEST)
         {
             // Send
+            // Convert to network byte order
+            convertpacket_hton(&send_data);
             // bytes_sent = sendto(sockfd, &send_data, send_data.length, 0,
             bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0,
                             (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
@@ -103,18 +99,16 @@ int main (int argc, char *argv[])
         // bytes_recv = recvfrom(sockfd, &recv_data, recv_data.length, 0,
         bytes_recv = recvfrom(sockfd, &recv_data, sizeof(struct gbnpacket), 0, 
                         (struct sockaddr*)&srv_addr, &sin_size);
+        // Convert to host byte order
+        convertpacket_ntoh(&recv_data);
+        
+        // Set packet lost or not
         lost_packet = play_the_odds(p_loss, &loss_count);
         if (lost_packet)
         {
             printf("\nLOST PACKET!\n\n");
             continue; // Do nothing else, just receive the packet and move on.
         }
-        // Convert to host byte order
-        /*
-        recv_data.type = ntohl(recv_data.type);
-        recv_data.sequence = ntohl(recv_data.sequence);
-        recv_data.length = ntohl(recv_data.length);
-        */
         // TO-DO: CHECK TO MAKE SURE THAT THE PROGRAM DOESN'T SEGFAULT IF recvfrom() FAILS! i.e. if bytesrecv == 0
         // recv_data.data[bytes_recv] = '\0';
         print_packet_info_client(&recv_data, SERVER);
@@ -136,6 +130,13 @@ int main (int argc, char *argv[])
             printf("%s. Sending FIN packet.\n", msg);
             printf("STATS: Sent %d corrupt ACKs. Treated %d packets as \'lost\'.\n",
                             corrupt_count, loss_count);
+            // Convert to network byte order
+            convertpacket_hton(&send_data);
+            /*
+            send_data.type = htonl(send_data.type);
+            send_data.sequence = htonl(send_data.sequence);
+            send_data.length = htonl(send_data.length);
+            */
             bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                             (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
 
@@ -193,6 +194,9 @@ int main (int argc, char *argv[])
 
 //            if (legit >= p_loss)
 //            {
+            // Convert to network byte order
+            convertpacket_hton(&send_data);
+            
             sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                     (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
             print_packet_info_client(&send_data, CLIENT);
@@ -215,6 +219,14 @@ int main (int argc, char *argv[])
             // sendto(sockfd, &send_data, send_data.length, 0, 
 //            if (legit >= p_loss)
 //            {
+            // Convert to network byte order
+            /*
+            send_data.type = htonl(send_data.type);
+            send_data.sequence = htonl(send_data.sequence);
+            send_data.length = htonl(send_data.length);
+            send_data.corrupt = htonl(send_data.corrupt);
+            */
+            convertpacket_hton(&send_data);
             sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                         (struct sockaddr *)&srv_addr, sizeof(struct sockaddr));
             print_packet_info_client(&send_data, CLIENT);

@@ -86,7 +86,8 @@ clientrequest:
     memset(&recv_data, 0, sizeof(struct gbnpacket)); // Zero out the packet
     bytes_read = recvfrom(sockfd, &recv_data, sizeof(struct gbnpacket), 0,
                                 (struct sockaddr *)&cli_addr, &addr_size);
-    recv_data.type = ntohl(recv_data.type);
+    // recv_data.type = ntohl(recv_data.type);
+    convertpacket_ntoh(&recv_data);
     if (recv_data.type == REQUEST) // We need to check if the file exists and split it into packets
     {
         // OPEN THE FILE, LOAD IT INTO A BUFFER
@@ -106,6 +107,8 @@ clientrequest:
             send_data.length = 0;
             // Don't need to initialize the data because of the memset
             printf("%s. Sending FIN packet.\n", msg);
+            
+            convertpacket_hton(&send_data);
             bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                             (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
             goto clientrequest;
@@ -131,6 +134,8 @@ clientrequest:
             send_data.length = 0;
             // Don't need to initialize the data because of the memset
             printf("%s. Sending FIN packet.\n", msg);
+
+            convertpacket_hton(&send_data);
             bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                             (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
             goto clientrequest;
@@ -165,6 +170,7 @@ clientrequest:
             send_data.length = 0;
             // Don't need to initialize the data because of the memset
             printf("%s. Sending FIN packet.\n", msg);
+            convertpacket_hton(&send_data);
             bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                             (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
             goto clientrequest;
@@ -215,6 +221,8 @@ clientrequest:
             {
                 bytes_read = recvfrom(sockfd, &recv_data, sizeof(struct gbnpacket), 0,
                                 (struct sockaddr *)&cli_addr, &addr_size);
+                // Convert packet to host byte order
+                convertpacket_ntoh(&recv_data);
                 lost_packet = play_the_odds(p_loss, &loss_count);
                 if (lost_packet)
                 {
@@ -326,7 +334,8 @@ servicerequest:
 //                double legit = drand48();
 //                if (legit >= p_loss)
 //                {
-                    bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
+                    convertpacket_hton(&send_data);
+                   bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, 
                             (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
                     /*
                     if (send_data.sequence/PACKETSIZE == base)
@@ -365,6 +374,7 @@ servicerequest:
                             corrupt_count, loss_count);
                 printf("===================================================\n");
                 printf("===================================================\n");
+                convertpacket_hton(&send_data);
                 bytes_sent = sendto(sockfd, &send_data, sizeof(struct gbnpacket), 0, (struct sockaddr *)&cli_addr, sizeof(struct sockaddr));
                 goto clientrequest;
             }
